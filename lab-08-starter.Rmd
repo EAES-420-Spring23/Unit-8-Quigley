@@ -1,7 +1,7 @@
 ---
 title: "Lab 08 - Quantifying Uncertainty"
-author: "Insert your name here"
-date: "Insert date here"
+author: "Louis Quigley"
+date: "05/01/2023"
 output: html_document
 ---
 
@@ -17,11 +17,13 @@ library(lubridate)
 
 ### Exercise 1
 
-Remove this text, and add your answer for Exercise 1 here.
+```{r import-data}
+fluxes <- read_csv("data/us-mms-simple.csv")
+```
 
 ## Fix dates
 
-```{r fix-dates, eval = F}
+```{r fix-dates}
 fluxes <- fluxes %>% 
   mutate(date = mdy_hm(date))
 head(fluxes)
@@ -29,49 +31,140 @@ head(fluxes)
 
 ### Exercise 2
 
-Remove this text, and add your answer for Exercise 2 here.
+```{r subset-fluxes}
+fluxes_subset <- fluxes %>% 
+  filter(date >= "2020-07-01" & date <= "2020-07-31") %>% 
+  select(date, fco2, incoming_radiation)
+head(fluxes_subset, 10) 
+
+head(fluxes_subset, 10) 
+```
 
 ### Exercise 3
 
-Remove this text, and add your answer for Exercise 3 here.
+```{r}
+num_rows <- nrow(fluxes_subset)
+```
+The code above shows 721 rows or observations in the values section of the environment. Each row represents an hourly measurement from the Morgan Monroe State Forest ecosystem flux tower. 
 
 ### Exercise 4
 
-Remove this text, and add your answer for Exercise 4 here.
+Our sample is exclusively for the month of July which only encompasses a third of the months in the summer season, therefore labeling our population as "summertime" would not be an accurate name. 
 
 ### Exercise 5
 
-Remove this text, and add your answer for Exercise 5 here.
+```{r FCO2-Inc_rad-graph}
+ggplot(fluxes_subset, aes(incoming_radiation, fco2)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = TRUE) +
+  labs(
+    title = "CO2 Flux vs. Incoming Radiation",
+    x = "Incoming Radiation",
+    y = "CO2 Flux"
+  ) +
+  theme_minimal()
+```
+  FCO2 is inversely proportionate to incoming radiation. The fitted line trends downwards, which means as incoming radiation increases, the amount of CO2 measured in the atmosphere is decreasing. 
 
 ### Exercise 6
 
-Remove this text, and add your answer for Exercise 6 here.
+```{r randomoize-and-slice}
+monroe_july_subsample <- fluxes_subset %>% 
+  mutate(row = 1:n(),
+         rrow = sample(row, size = n(), replace  = F)) %>% 
+  arrange(rrow) %>% 
+  slice_head(n = round(0.2 * num_rows))
+```
 
 ### Exercise 7
 
-Remove this text, and add your answer for Exercise 7 here.
+```{r create-bootstraps}
+monroe_july_boot <- bootstraps(monroe_july_subsample, times = 1000)
+```
+
 
 ### Exercise 8
 
-Remove this text, and add your answer for Exercise 8 here.
+```{r fit-models}
+monroe_july_models <- monroe_july_boot %>%
+  mutate(
+    model = map(splits, ~ lm(fco2 ~ incoming_radiation, data = analysis(.))),
+    coef_info = map(model, tidy))
+```
+
 
 ### Exercise 9
 
-Remove this text, and add your answer for Exercise 9 here.
+```{r get-slope-range}
+monrie_july_coef <- monroe_july_models %>%
+  unnest(coef_info)
+
+int_pctl(monroe_july_models, coef_info)
+```
 
 ### Exercise 10
 
-Remove this text, and add your answer for Exercise 10 here.
+```{r create-warm-temperatures}
+temps_june_july <- fluxes %>% 
+  filter(date > "2020-06-01" & date < "2020-07-31") %>% 
+  mutate(warm_temperatures = case_when(
+    air_temperature > 20 ~ "yes",
+    air_temperature <= 20 ~ "no",
+    TRUE ~ NA
+  ),
+  month = case_when(
+    date >= "2020-06-01" & date <= "2020-06-30" ~ "June",
+    date >= "2020-07-01" & date <= "2020-07-31" ~ "July",
+    TRUE ~ NA
+  )
+  ) %>% 
+  select(month, air_temperature, warm_temperatures)
+```
 
 ### Exercise 11
 
-Remove this text, and add your answer for Exercise 11 here.
+```{r visualize-warm-temperatures}
+temps_june_july %>% 
+  filter(!is.na(month) & !is.na(warm_temperatures)) %>% 
+  mutate(month = fct_relevel(month, "June", "July")) %>% 
+  ggplot(aes(month, fill = warm_temperatures)) +
+  geom_bar() +
+  scale_fill_manual(values = c("blue", "orange")) +
+  theme_minimal() +
+  labs(title = "Hours of warm or cool temperatures",
+       subtitle = "In June and July",
+       y = "Count",
+       x = "Month",
+       fill = "Temp > 20-degrees C?") +
+  theme_bw()
+```
+
+```{r get-counts}
+temps_june_july %>% 
+  filter(!is.na(month) & !is.na(warm_temperatures)) %>% 
+  group_by(month) %>% 
+  summarize(warm = sum(warm_temperatures == "yes"),
+            cool = sum(warm_temperatures == "no"),
+            total_hours = n())
+```
 
 ### Exercise 12
 
-Remove this text, and add your answer for Exercise 12 here.
+```{r calculate-sample-p}
+p_hat <- (624/655) - (550/692) # Eqn is n_yes_july/n_all_july - n_yes_june/n_all_june
+p_hat
+```
 
 ### Exercise 13
 
-Remove this text, and add your answer for Exercise 13 here.
-
+```{r test-temperature-hypothesis}
+set.seed(35)
+temps_june_july %>%
+  filter(!is.na(month) & !is.na(warm_temperatures)) %>% 
+  specify(warm_temperatures ~ month, success = "yes") %>%
+  hypothesize(null = "independence") %>%
+  generate(reps = 1000, type = "permute") %>%
+  calculate(stat = "diff in props", order = c("June", "July")) %>% 
+  summarize(p_value = sum(stat > p_hat) / n())
+```
+The given p_value is 0, therefore the null hypothesis seems to be correct and temperature does correlate with month. 
