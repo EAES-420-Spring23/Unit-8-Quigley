@@ -51,7 +51,7 @@ The code above shows 721 rows or observations in the values section of the envir
 
 Our sample is exclusively for the month of July which only encompasses a third of the months in the summer season, therefore labeling our population as "summertime" would not be an accurate name. 
 
-### Exercise 5
+### Exercise 5-1
 
 ```{r FCO2-Inc_rad-graph}
 ggplot(fluxes_subset, aes(incoming_radiation, fco2)) +
@@ -148,14 +148,14 @@ temps_june_july %>%
             total_hours = n())
 ```
 
-### Exercise 12
+### Exercise 12-.5
 
 ```{r calculate-sample-p}
 p_hat <- (624/655) - (550/692) # Eqn is n_yes_july/n_all_july - n_yes_june/n_all_june
 p_hat
 ```
 
-### Exercise 13
+### Exercise 13-.5
 
 ```{r test-temperature-hypothesis}
 set.seed(35)
